@@ -1,0 +1,112 @@
+import numpy
+import cv2
+import os
+import matplotlib.pyplot as plt
+from tensorflow.python.keras.models import load_model
+import numpy as np
+import sys
+import random
+from tensorflow import keras
+# Just disables the warning, doesn't take advantage of AVX/FMA to run faster
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+class CNNDetector:
+    def __init__(self, checkpoint_file, input_shape=(64, 64)):
+        self.input_shape = input_shape
+        self.model = keras.models.load_model(checkpoint_file)
+
+    def predict_image_file(self, filename):
+        img = cv2.imread(filename)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = cv2.resize(
+            img, (int(self.input_shape[0]), int(self.input_shape[1])))
+        img_converted = img.reshape(1, 64, 64, 3)
+        return self.model.predict(img_converted)
+
+
+def pick_random_files(n_files, path, class_names):
+    image_files = []
+    for name in class_names:
+        tmp = os.listdir(path+name)
+        for i in range(int(n_files/len(class_names))):
+            image_files.append(path+name+"/"+random.choice(tmp))
+    random.shuffle(image_files)
+    return image_files
+
+
+# Test set
+WORSKPACE_BASE_PATH = "/home/s1171439/test1/tensorflow-crack-classification/"
+IMG_PATH = WORSKPACE_BASE_PATH+"data/datasets/cracks_splitted8020/test_set/"
+N_TEST_IMAGES = 1000
+CLASS_NAMES = ["Positive"]
+
+# Model configuration :: SimpleNet
+CHECKPOINT_FILE = WORSKPACE_BASE_PATH+"model-checkpoints/simplenet_cracks8020_weights.01-0.04.hdf5"
+INPUT_IMAGE_WIDTH = 64
+INPUT_IMAGE_HEIGHT = 64
+cnn = CNNDetector(CHECKPOINT_FILE)
+image_files = pick_random_files(N_TEST_IMAGES, IMG_PATH, CLASS_NAMES)
+prediction = cnn.predict_image_file(image_files[0])
+print(prediction)
+def label_contour_center(image, c):
+    # Places some text over the contours
+        M = cv2.moments(c)
+        cx = int(M['m10'] / M['m00'])
+        cy = int(M['m01'] / M['m00'])
+        cv2.putText(image, "#{}".format(i + 1), (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, .3, (255,150,250), 1)
+        return image
+IMAGE_PATH = '/home/s1171439/webCracks/'
+image_files = pick_random_files(N_TEST_IMAGES, IMG_PATH, CLASS_NAMES)
+for imagee in image_files:
+    image=imagee
+    prediction = cnn.predict_image_file(imagee)
+    print(prediction)
+    image = cv2.imread(image)
+    if(prediction[0][0]==0):
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+        canny = cv2.Canny(blurred, 120, 255, 1)
+    # Find contours
+        cnts = cv2.findContours(canny, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+        largest_area = [0,0,0,0]
+        largest_area_contour0 = 0
+        largest_area_contour1 = 0
+        largest_area_contour2 = 0
+        largest_area_contour3 = 0
+
+        for c in cnts:
+            x,y,w,h = cv2.boundingRect(c)
+            area = 8*w*h
+            if area > largest_area[0] :
+                largest_area[0] = area
+                largest_area_contour0 = c
+            elif area > largest_area[1] :
+                largest_area[1] = area
+                largest_area_contour1 = c
+            elif area > largest_area[2] :
+                largest_area[2] = area
+                largest_area_contour2 = c
+            elif area > largest_area[3] :
+                largest_area[3] = area
+                largest_area_contour3 = c
+
+        print(largest_area)
+        if np.any((largest_area_contour0==0))!=True:
+            x,y,w,h = cv2.boundingRect(largest_area_contour0)
+            cv2.rectangle(image, (x, y), (x + w, y + h), (36,255,12), 2)
+        if np.any((largest_area_contour1==0))!=True:
+            x,y,w,h = cv2.boundingRect(largest_area_contour1)
+            cv2.rectangle(image, (x, y), (x + w, y + h), (36,255,12), 2)
+        if np.any((largest_area_contour2==0))!=True:
+            x,y,w,h = cv2.boundingRect(largest_area_contour2)
+            cv2.rectangle(image, (x, y), (x + w, y + h), (36,255,12), 2)
+        if np.any((largest_area_contour3==0))!=True:
+            x,y,w,h = cv2.boundingRect(largest_area_contour3)
+            cv2.rectangle(image, (x, y), (x + w, y + h), (36,255,12), 2)
+
+    #  image=cv2.rectangle(image, pt1, pt2, (255,0,0), 2)
+    cv2.imwrite(os.path.join(IMAGE_PATH , 'output.jpg'), image)
+    cv2.waitKey(0)
+
+
